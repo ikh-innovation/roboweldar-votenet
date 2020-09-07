@@ -33,6 +33,7 @@ def preprocess_point_cloud(point_cloud):
     ''' Prepare the numpy point cloud (N,3) for forward pass '''
     point_cloud = point_cloud[:,0:3] # do not use color for now
     floor_height = np.percentile(point_cloud[:,2],0.99)
+    print("floor_height", floor_height)
     height = point_cloud[:,2] - floor_height
     point_cloud = np.concatenate([point_cloud, np.expand_dims(height, 1)],1) # (N,4) or (N,7)
     point_cloud = random_sampling(point_cloud, FLAGS.num_point)
@@ -82,11 +83,14 @@ if __name__=='__main__':
     # Load and preprocess input point cloud 
     net.eval() # set model to eval mode (for bn and dp)
     point_cloud = read_ply(pc_path)
+    print("point_cloud",point_cloud)
     pc = preprocess_point_cloud(point_cloud)
+    print("pc",pc)
     print('Loaded point cloud data: %s'%(pc_path))
    
     # Model inference
     inputs = {'point_clouds': torch.from_numpy(pc).to(device)}
+    print(inputs)
     tic = time.time()
     with torch.no_grad():
         end_points = net(inputs)

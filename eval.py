@@ -86,6 +86,17 @@ elif FLAGS.dataset == 'scannet':
     TEST_DATASET = ScannetDetectionDataset('val', num_points=NUM_POINT,
         augment=False,
         use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
+elif FLAGS.dataset == 'panelnet':
+    sys.path.append(os.path.join(ROOT_DIR, 'panelnet'))
+    from panel_dataset import PanelDetectionVotesDataset, MAX_NUM_OBJ
+    from panel_model_util import PanelDatasetConfig
+    DATASET_CONFIG = PanelDatasetConfig()
+    TRAIN_DATASET = PanelDetectionVotesDataset('train', num_points=NUM_POINT,
+        augment=True,
+        use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
+    TEST_DATASET = PanelDetectionVotesDataset('val', num_points=NUM_POINT,
+        augment=False)
+        # use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
 else:
     print('Unknown dataset %s. Exiting...'%(FLAGS.dataset))
     exit(-1)
@@ -144,6 +155,7 @@ def evaluate_one_epoch():
         
         # Forward pass
         inputs = {'point_clouds': batch_data_label['point_clouds']}
+
         with torch.no_grad():
             end_points = net(inputs)
 
