@@ -34,7 +34,7 @@ import panelnet_utils
 from panel_model_util import PanelDatasetConfig
 
 DC = PanelDatasetConfig() # dataset specific config
-MAX_NUM_OBJ = 4 # maximum number of objects allowed per scene
+MAX_NUM_OBJ = 3 # maximum number of objects allowed per scene
 MEAN_COLOR_RGB = np.array([0.5,0.5,0.5]) # sunrgbd color is in 0~1
 
 class PanelDetectionVotesDataset(Dataset):
@@ -48,7 +48,7 @@ class PanelDetectionVotesDataset(Dataset):
             'dataset/panel_data_%s'%(split_set))
 
         self.raw_data_path = os.path.join(BASE_DIR, 'dataset/panel_data_trainval')
-        self.scan_names = sorted(list(set([os.path.basename(x)[0:3] \
+        self.scan_names = sorted(list(set([os.path.basename(x)[0:4] \
             for x in os.listdir(self.data_path)])))
         if scan_idx_list is not None:
             self.scan_names = [self.scan_names[i] for i in scan_idx_list]

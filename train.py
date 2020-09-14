@@ -42,9 +42,7 @@ from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', default='votenet', help='Model file name [default: votenet]')
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
-parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
-parser.add_argument('--log_dir', default='log', help='Dump dir to save model checkpoint [default: log]')
-parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
+parser.add_argument('--log_dir', default=None, help='Dump dir to save model checkpoint [default: log]')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
 parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
 parser.add_argument('--vote_factor', type=int, default=1, help='Vote factor [default: 1]')
@@ -61,7 +59,6 @@ parser.add_argument('--lr_decay_rates', default='0.1,0.1,0.1', help='Decay rates
 parser.add_argument('--no_height', action='store_true', help='Do NOT use height signal in input.')
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
 parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use V2 box labels for SUN RGB-D dataset')
-parser.add_argument('--overwrite', action='store_true', help='Overwrite existing log and dump folders.')
 parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 FLAGS = parser.parse_args()
 
@@ -76,33 +73,31 @@ LR_DECAY_STEPS = [int(x) for x in FLAGS.lr_decay_steps.split(',')]
 LR_DECAY_RATES = [float(x) for x in FLAGS.lr_decay_rates.split(',')]
 assert(len(LR_DECAY_STEPS)==len(LR_DECAY_RATES))
 LOG_DIR = FLAGS.log_dir
-DEFAULT_DUMP_DIR = os.path.join(BASE_DIR, os.path.basename(LOG_DIR))
-DUMP_DIR = FLAGS.dump_dir if FLAGS.dump_dir is not None else DEFAULT_DUMP_DIR
-DEFAULT_CHECKPOINT_PATH = os.path.join(LOG_DIR, 'checkpoint.tar')
-CHECKPOINT_PATH = FLAGS.checkpoint_path if FLAGS.checkpoint_path is not None \
-    else DEFAULT_CHECKPOINT_PATH
-FLAGS.DUMP_DIR = DUMP_DIR
+DEFAULT_LOG_DIR = 'log_' + FLAGS.dataset
+if not FLAGS.log_dir:
+    time_stump = datetime.now().strftime("%m-%d-%H:%M")
+    LOG_DIR = os.path.join(DEFAULT_LOG_DIR, 'log_' + time_stump)
+else:
+    LOG_DIR = os.path.join(BASE_DIR, LOG_DIR)
+FLAGS.log_dir = LOG_DIR
 
-# Prepare LOG_DIR and DUMP_DIR
-if os.path.exists(LOG_DIR) and FLAGS.overwrite:
-    print('Log folder %s already exists. Are you sure to overwrite? (Y/N)'%(LOG_DIR))
-    c = input()
-    if c == 'n' or c == 'N':
-        print('Exiting..')
-        exit()
-    elif c == 'y' or c == 'Y':
-        print('Overwrite the files in the log and dump folers...')
-        os.system('rm -r %s %s'%(LOG_DIR, DUMP_DIR))
+DUMP_DIR = os.path.join(LOG_DIR, 'results_dump')
+
+CHECKPOINT_PATH = os.path.join(LOG_DIR, 'checkpoint.tar')
+
+FLAGS.DUMP_DIR = DUMP_DIR
 
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'a')
 LOG_FOUT.write(str(FLAGS)+'\n')
+
 def log_string(out_str):
     LOG_FOUT.write(out_str+'\n')
     LOG_FOUT.flush()
     print(out_str)
+
 if not os.path.exists(DUMP_DIR): os.mkdir(DUMP_DIR)
 
 # Init datasets and dataloaders 
@@ -140,11 +135,10 @@ elif FLAGS.dataset == 'panelnet':
     from panel_model_util import PanelDatasetConfig
     DATASET_CONFIG = PanelDatasetConfig()
     TRAIN_DATASET = PanelDetectionVotesDataset('train', num_points=NUM_POINT,
-        augment=True,
+        augment=False,
         use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
     TEST_DATASET = PanelDetectionVotesDataset('val', num_points=NUM_POINT,
-        augment=False)
-        # use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
+        augment=False, use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
 else:
     print('Unknown dataset %s. Exiting...'%(FLAGS.dataset))
     exit(-1)
@@ -187,7 +181,7 @@ optimizer = optim.Adam(net.parameters(), lr=BASE_LEARNING_RATE, weight_decay=FLA
 # Load checkpoint if there is any
 it = -1 # for the initialize value of `LambdaLR` and `BNMomentumScheduler`
 start_epoch = 0
-if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
+if CHECKPOINT_PATH is os.path.isfile(CHECKPOINT_PATH):
     checkpoint = torch.load(CHECKPOINT_PATH)
     net.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -296,7 +290,7 @@ def evaluate_one_epoch():
         ap_calculator.step(batch_pred_map_cls, batch_gt_map_cls)
 
         # Dump evaluation results for visualization
-        if FLAGS.dump_results and batch_idx == 0 and EPOCH_CNT %10 == 0:
+        if FLAGS.dump_results and batch_idx == 0 and EPOCH_CNT %1 == 0:
             MODEL.dump_results(end_points, DUMP_DIR, DATASET_CONFIG) 
 
     # Log statistics
@@ -328,7 +322,7 @@ def train(start_epoch):
         # REF: https://github.com/pytorch/pytorch/issues/5059
         np.random.seed()
         train_one_epoch()
-        if EPOCH_CNT == 0 or EPOCH_CNT % 10 == 9: # Eval every 10 epochs
+        if EPOCH_CNT == 0 or EPOCH_CNT % 10 == 0: # Eval every 10 epochs
             loss = evaluate_one_epoch()
         # Save checkpoint
         save_dict = {'epoch': epoch+1, # after training one epoch, the start_epoch should be epoch+1

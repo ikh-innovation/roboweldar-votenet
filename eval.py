@@ -51,7 +51,7 @@ if FLAGS.use_cls_nms:
 # ------------------------------------------------------------------------- GLOBAL CONFIG BEG
 BATCH_SIZE = FLAGS.batch_size
 NUM_POINT = FLAGS.num_point
-DUMP_DIR = FLAGS.dump_dir
+DUMP_DIR = os.path.join(ROOT_DIR,FLAGS.dump_dir)
 CHECKPOINT_PATH = FLAGS.checkpoint_path
 assert(CHECKPOINT_PATH is not None)
 FLAGS.DUMP_DIR = DUMP_DIR
@@ -95,8 +95,7 @@ elif FLAGS.dataset == 'panelnet':
         augment=True,
         use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
     TEST_DATASET = PanelDetectionVotesDataset('val', num_points=NUM_POINT,
-        augment=False)
-        # use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
+        augment=False, use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
 else:
     print('Unknown dataset %s. Exiting...'%(FLAGS.dataset))
     exit(-1)

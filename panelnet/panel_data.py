@@ -6,7 +6,6 @@ import os
 import time
 
 CLASS_WHITELIST = ['panel', 'floor']
-o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
 
 class LabelBox:
 
@@ -64,11 +63,9 @@ def generate_welding_area(panels_num=2, vis=False):
         panel.translate(panel_config.translation)
 
         #bounding label box
-        axis_bounding_box = panel.get_axis_aligned_bounding_box()
-        center_aligned = axis_bounding_box.get_center()
-        # size2 = axis_bounding_box.get_half_extent() #TRUE DIMENSIONS?
-        #switch_xy ??
-        labelbox = LabelBox(center_aligned, np.array(panel_config.size)/2, -panel_config.rotation[2], CLASS_WHITELIST[0], axis_bounding_box)
+        oriented_bounding_box = panel.get_oriented_bounding_box()
+        center_oriented = oriented_bounding_box.get_center()
+        labelbox = LabelBox(center_oriented, np.array(panel_config.size)/2, -panel_config.rotation[2], CLASS_WHITELIST[0], oriented_bounding_box)
 
         panels.append(panel)
         labelboxes.append(labelbox)
@@ -82,13 +79,21 @@ def generate_welding_area(panels_num=2, vis=False):
     return mesh, labelboxes
 
 
-def export(idx: int, mesh, labelboxes: [LabelBox], output_folder, n_points):
+def export(idx: int, mesh, labelboxes: [LabelBox], output_folder, n_points, export_mesh=True):
     #--------mesh----------
-    o3d.io.write_triangle_mesh(os.path.join(output_folder,"%03d_mesh.ply" % idx), mesh, compressed=True, write_vertex_colors=True)
+    if export_mesh:
+        o3d.io.write_triangle_mesh(os.path.join(output_folder,"%04d_mesh.ply" % idx), mesh, compressed=True, write_vertex_colors=True)
 
     #-----pointcloud---------
-    sampled_pointcloud = mesh.sample_points_poisson_disk(number_of_points=int(n_points), init_factor=10,  use_triangle_normal=True)
-    np.savez_compressed(os.path.join(output_folder, '%03d_pc.npz' % idx), pc=np.asarray(sampled_pointcloud.points))
+    # sampled_pointcloud = mesh.sample_points_poisson_disk(number_of_points=int(n_points), init_factor=10,  use_triangle_normal=True) # better sampling
+    sampled_pointcloud = mesh.sample_points_uniformly(number_of_points=int(n_points),  use_triangle_normal=True) # quicker sampling
+
+    # add ground floor as noise
+
+    floor_noise = produce_floor_noise()
+    pc = np.vstack((np.asarray(sampled_pointcloud.points), floor_noise))
+
+    np.savez_compressed(os.path.join(output_folder, '%04d_pc.npz' % idx), pc=pc)
 
     #--------bbox/labelbox--------
     object_list = []
@@ -105,10 +110,10 @@ def export(idx: int, mesh, labelboxes: [LabelBox], output_folder, n_points):
     else:
         obbs = np.vstack(object_list)  # (K,8)
 
-    np.save(os.path.join(output_folder, '%03d_bbox.npy' % (idx)), obbs)
+    np.save(os.path.join(output_folder, '%04d_bbox.npy' % (idx)), obbs)
 
     #---------save votes----------
-    N = len(sampled_pointcloud.points)
+    N = len(pc)
     point_votes = np.zeros((N, 10))  # 3 votes and 1 vote mask
     point_vote_idx = np.zeros((N)).astype(np.int32)  # in the range of [0,2]
     indices = np.arange(N)
@@ -117,10 +122,10 @@ def export(idx: int, mesh, labelboxes: [LabelBox], output_folder, n_points):
         if lb.classname not in CLASS_WHITELIST: continue
         try:
             # Find all points in this object's OBB
-            box3d_pts_inds = lb.bounding_box.get_point_indices_within_bounding_box(sampled_pointcloud.points)
+            box3d_pts_inds = lb.bounding_box.get_point_indices_within_bounding_box(o3d.utility.Vector3dVector(pc))
             # Assign first dimension to indicate it is in an object box
             point_votes[box3d_pts_inds, 0] = 1
-            pc_in_box3d =  np.asarray(sampled_pointcloud.points)[box3d_pts_inds]
+            pc_in_box3d = pc[box3d_pts_inds]
             # Add the votes (all 0 if the point is not in any object's OBB)
             votes = np.expand_dims(lb.center, 0) - pc_in_box3d[:, 0:3]
             sparse_inds = indices[box3d_pts_inds]  # turn dense True,False inds to sparse number-wise inds
@@ -135,27 +140,48 @@ def export(idx: int, mesh, labelboxes: [LabelBox], output_folder, n_points):
         except:
             print('ERROR ----', idx, lb.classname)
 
-    np.savez_compressed(os.path.join(output_folder, '%03d_votes.npz' % (idx)),
-                        point_votes=point_votes)
+    np.savez_compressed(os.path.join(output_folder, '%04d_votes.npz' % (idx)), point_votes=point_votes)
 
+def produce_floor_noise(floor_radius=3, z_var=0.01, points_num=15000):
+    # add ground floor as noise
+    return np.random.uniform([-floor_radius, -floor_radius, -z_var], [floor_radius, floor_radius, z_var], [points_num, 3])
 
+def produce_unseen_sample_as_np(n_points):
+    print(f'Producing unseen sample...')
+    mesh, labelboxes = generate_welding_area()
+    pt = mesh.sample_points_uniformly(number_of_points=int(n_points*3/4),  use_triangle_normal=True)
 
-
+    floor_noise = produce_floor_noise(points_num=int(n_points/4))
+    pcd = np.vstack((np.asarray(pt.points), floor_noise))
+    print(len(pcd))
+    # o3d.io.write_point_cloud(os.path.join(output_folder, "unseen_pointcloud.ply"), pcd)
+    return pcd
 
 if __name__ == '__main__':
-    items_gen_num = 60
-    train2test_ratio = 0.8
+    items_gen_num = 12000
+    train2test_ratio = 0.6
     output_folder= "dataset"
     train_output_folder = "dataset/panel_data_train"
     val_output_folder = "dataset/panel_data_val"
-    n_points = 50000
+    n_points = 40000
+    overwrite = False
+    train_ids = []
+    val_ids = []
+    # o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
 
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
+
     if not os.path.exists(train_output_folder):
         os.mkdir(train_output_folder)
+    else:
+        train_dirs = os.listdir(train_output_folder)
+        train_ids = [int(name[0:4]) for name in train_dirs]
     if not os.path.exists(val_output_folder):
         os.mkdir(val_output_folder)
+    else:
+        val_dirs = os.listdir(val_output_folder)
+        val_ids = [int(name[0:4]) for name in val_dirs]
 
     #DEBUG
     # mesh, labelboxes = generate_welding_area(vis=True)
@@ -165,21 +191,23 @@ if __name__ == '__main__':
     #training
     print("---------Training dataset----------")
     for i in range(int(items_gen_num * train2test_ratio)):
+        if (not overwrite) and (i in train_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"...")
         mesh, labelboxes = generate_welding_area()
         print(f'Exporting welding area...')
-        export(i, mesh, labelboxes, train_output_folder, n_points)
+        export(i, mesh, labelboxes, train_output_folder, n_points, export_mesh=False)
         end = time.time()
         print("Welding area no.", i, "completed in ",end - start, "seconds \n")
 
     #testing
     print(" \n \n---------Validation dataset---------- \n")
     for i in range(int(items_gen_num * (1 - train2test_ratio))+1):
+        if (not overwrite) and (i in val_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"... \n")
         mesh, labelboxes = generate_welding_area()
         print(f'Exporting welding area...')
-        export(i, mesh, labelboxes, val_output_folder, n_points)
+        export(i, mesh, labelboxes, val_output_folder, n_points, export_mesh=False)
         end = time.time()
         print("Welding area no.", i, "completed in ", end - start, "seconds \n")

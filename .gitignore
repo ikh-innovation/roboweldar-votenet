@@ -44,3 +44,16 @@ panelnet/dataset/
 .idea/
 demo_files/
 geometric_shapes/
+
+*.ply
+*.json
+*.txt
+*.png
+OFFICIAL_SUNRGBD/
+sunrgbd_pc_bbox_votes_50k_v2_train/
+sunrgbd_pc_bbox_votes_50k_v2_val/
+sunrgbd_trainval/
+__pycache__/
+dump_eval_panelnet/
+eval_sunrgbd/
+sunrgbd/data_viz_dump/

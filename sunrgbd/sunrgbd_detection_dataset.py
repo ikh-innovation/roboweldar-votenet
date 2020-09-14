@@ -268,7 +268,7 @@ def get_sem_cls_statistics():
     print(sem_cls_cnt)
 
 if __name__=='__main__':
-    d = SunrgbdDetectionVotesDataset(use_height=True, use_color=True, use_v1=True, augment=True)
+    d = SunrgbdDetectionVotesDataset(use_height=True, use_color=True, use_v1=False, augment=True)
     sample = d[200]
     print(sample['vote_label'].shape, sample['vote_label_mask'].shape)
     pc_util.write_ply(sample['point_clouds'], 'pc.ply')
