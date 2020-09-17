@@ -19,8 +19,21 @@ parser.add_argument('--dataset', default='panelnet', help='Dataset: sunrgbd or s
 parser.add_argument('--checkpoint_dir',  help='checkpoint directory of the thrained weights.')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
 parser.add_argument('--use_height', type=bool, default=False, help='Use height? [default: False]')
+parser.add_argument('--use_color', type=bool, default=False, help='Use height? [default: False]')
 parser.add_argument('--pc_path', type=str, default='generate', help='Pointcloud absolute path. [generate] for random generation')
 parser.add_argument('--cluster_sampling', default='vote_fps', help='Sampling strategy for vote clusters: vote_fps, seed_fps, random [default: vote_fps]')
+parser.add_argument('--model', default='votenet', help='Model file name [default: votenet]')
+parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
+parser.add_argument('--vote_factor', type=int, default=1, help='Vote factor [default: 1]')
+parser.add_argument('--use_3d_nms', action='store_true', help='Use 3D NMS instead of 2D NMS.')
+parser.add_argument('--use_cls_nms', action='store_true', help='Use per class NMS.')
+parser.add_argument('--use_old_type_nms', action='store_true', help='Use old type of NMS, IoBox2Area.')
+parser.add_argument('--per_class_proposal', action='store_true', help='Duplicate each proposal num_class times.')
+parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU threshold. [default: 0.25]')
+parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
+parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
+
+
 
 FLAGS = parser.parse_args()
 
@@ -165,18 +178,39 @@ if __name__=='__main__':
         print('Unkown dataset %s. Exiting.'%(DATASET))
         exit(-1)
 
-    eval_config_dict = {'remove_empty_box': True, 'use_3d_nms': True, 'nms_iou': 0.25,
-        'use_old_type_nms': False, 'cls_nms': False, 'per_class_proposal': False,
-        'conf_thresh': 0.5, 'dataset_config': DC}
+    eval_config_dict = {'remove_empty_box': True, 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,
+        'use_old_type_nms': FLAGS.use_old_type_nms, 'cls_nms': FLAGS.use_cls_nms,
+                   'per_class_proposal': FLAGS.per_class_proposal,
+                   'conf_thresh': FLAGS.conf_thresh, 'dataset_config': DC}
+
 
     # Init the model and optimzier
-    MODEL = importlib.import_module('votenet') # import network module
+    # MODEL = importlib.import_module('votenet') # import network module
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # net = MODEL.VoteNet(num_proposal=256, input_feature_dim=int(FLAGS.use_height)*1, vote_factor=1,
+    #     sampling=FLAGS.cluster_sampling, num_class=DC.num_class,
+    #     num_heading_bin=DC.num_heading_bin,
+    #     num_size_cluster=DC.num_size_cluster,
+    #     mean_size_arr=DC.mean_size_arr).to(device)
+
+    MODEL = importlib.import_module(FLAGS.model)  # import network module
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = MODEL.VoteNet(num_proposal=256, input_feature_dim=int(FLAGS.use_height)*1, vote_factor=1,
-        sampling=FLAGS.cluster_sampling, num_class=DC.num_class,
-        num_heading_bin=DC.num_heading_bin,
-        num_size_cluster=DC.num_size_cluster,
-        mean_size_arr=DC.mean_size_arr).to(device)
+    num_input_channel = int(FLAGS.use_height)*1
+
+    if FLAGS.model == 'boxnet':
+        Detector = MODEL.BoxNet
+    else:
+        Detector = MODEL.VoteNet
+
+    net = Detector(num_class=DC.num_class,
+                   num_heading_bin=DC.num_heading_bin,
+                   num_size_cluster=DC.num_size_cluster,
+                   mean_size_arr=DC.mean_size_arr,
+                   num_proposal=FLAGS.num_target,
+                   input_feature_dim=num_input_channel,
+                   vote_factor=FLAGS.vote_factor,
+                   sampling=FLAGS.cluster_sampling).to(device)
+
     print('Constructed model.')
     
     # Load checkpoint

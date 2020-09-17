@@ -34,7 +34,7 @@ import panelnet_utils
 from panel_model_util import PanelDatasetConfig
 
 DC = PanelDatasetConfig() # dataset specific config
-MAX_NUM_OBJ = 3 # maximum number of objects allowed per scene
+MAX_NUM_OBJ = 32 # maximum number of objects allowed per scene
 MEAN_COLOR_RGB = np.array([0.5,0.5,0.5]) # sunrgbd color is in 0~1
 
 class PanelDetectionVotesDataset(Dataset):
@@ -266,8 +266,8 @@ def get_sem_cls_statistics():
 
 if __name__=='__main__':
     # d = PanelDetectionVotesDataset(use_height=True, use_color=True, use_v1=True, augment=True)
-    d = PanelDetectionVotesDataset()
-    sample = d[0]
+    d = PanelDetectionVotesDataset('test')
+    sample = d[120]
     print(sample['vote_label'].shape, sample['vote_label_mask'].shape)
     pc_util.write_ply(sample['point_clouds'], 'pc.ply')
     viz_votes(sample['point_clouds'], sample['vote_label'], sample['vote_label_mask'])

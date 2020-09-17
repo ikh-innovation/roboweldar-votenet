@@ -87,6 +87,8 @@ CHECKPOINT_PATH = os.path.join(LOG_DIR, 'checkpoint.tar')
 
 FLAGS.DUMP_DIR = DUMP_DIR
 
+if not os.path.exists(DEFAULT_LOG_DIR):
+    os.mkdir(DEFAULT_LOG_DIR)
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 

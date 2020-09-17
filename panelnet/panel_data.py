@@ -26,10 +26,14 @@ class PanelConfig:
         self.rotation = rotation
         self.size = size
 
-    def randomize(self,translation_radius=1):
+    def randomize(self,translation_radius=1, is_floor=False):
         self.translation = (np.random.uniform(-translation_radius, translation_radius), np.random.uniform(-translation_radius, translation_radius), 0)
         self.rotation = (0,0, np.random.uniform(0, 2*np.pi))
-        self.size = (np.random.uniform(0.01,0.1), np.random.uniform(1, 3), np.random.uniform(0.5, 1.5))
+        if not is_floor:
+            self.size = (np.random.uniform(0.04,0.1), np.random.uniform(1, 3), np.random.uniform(0.5, 1.5))
+        else:
+            self.size = (np.random.uniform(1, 3), np.random.uniform(1, 3), np.random.uniform(0.04,0.1))
+
 
 def switch_xy(size: np.array):
     return np.array([size[1], size[0], size[2]])
@@ -47,11 +51,13 @@ def create_panel(size=(1,1,1), sub_iter=4, noise = 0.01 ):
     return mesh
 
 
-def generate_welding_area(panels_num=2, vis=False):
+def generate_welding_area(panels_num=2, floors_num=1, vis=False):
     coords = o3d.geometry.TriangleMesh.create_coordinate_frame()
 
     panels = []
     labelboxes = []
+
+    #vertical panels
     for i in range(panels_num):
         #creation
         panel_config = PanelConfig()
@@ -66,6 +72,25 @@ def generate_welding_area(panels_num=2, vis=False):
         oriented_bounding_box = panel.get_oriented_bounding_box()
         center_oriented = oriented_bounding_box.get_center()
         labelbox = LabelBox(center_oriented, np.array(panel_config.size)/2, -panel_config.rotation[2], CLASS_WHITELIST[0], oriented_bounding_box)
+
+        panels.append(panel)
+        labelboxes.append(labelbox)
+
+    #floors
+    for i in range(floors_num):
+        #creation
+        panel_config = PanelConfig()
+        panel_config.randomize(is_floor=True)
+        panel = create_panel(panel_config.size, sub_iter=4, noise = 0.01)
+        panel.paint_uniform_color(list(np.random.random(3)))
+        #transformations
+        panel.rotate(o3d.geometry.get_rotation_matrix_from_xyz(panel_config.rotation), panel.get_center())
+        panel.translate(panel_config.translation)
+
+        #bounding label box
+        oriented_bounding_box = panel.get_oriented_bounding_box()
+        center_oriented = oriented_bounding_box.get_center()
+        labelbox = LabelBox(center_oriented, np.array(panel_config.size)/2, -panel_config.rotation[2], CLASS_WHITELIST[1], oriented_bounding_box)
 
         panels.append(panel)
         labelboxes.append(labelbox)
@@ -91,7 +116,8 @@ def export(idx: int, mesh, labelboxes: [LabelBox], output_folder, n_points, expo
     # add ground floor as noise
 
     floor_noise = produce_floor_noise()
-    pc = np.vstack((np.asarray(sampled_pointcloud.points), floor_noise))
+    random_noise = produce_random_noise()
+    pc = np.vstack((np.asarray(sampled_pointcloud.points), floor_noise, random_noise))
 
     np.savez_compressed(os.path.join(output_folder, '%04d_pc.npz' % idx), pc=pc)
 
@@ -146,23 +172,31 @@ def produce_floor_noise(floor_radius=3, z_var=0.01, points_num=15000):
     # add ground floor as noise
     return np.random.uniform([-floor_radius, -floor_radius, -z_var], [floor_radius, floor_radius, z_var], [points_num, 3])
 
+def produce_random_noise(radius=2, points_num=2000):
+    # add general noise
+    return np.random.uniform([-radius, -radius, 0], [radius, radius, radius], [points_num, 3])
+
 def produce_unseen_sample_as_np(n_points):
     print(f'Producing unseen sample...')
-    mesh, labelboxes = generate_welding_area()
-    pt = mesh.sample_points_uniformly(number_of_points=int(n_points*3/4),  use_triangle_normal=True)
+    # mesh, labelboxes = generate_welding_area()
+    mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2, 5), floors_num=np.random.randint(1, 3))
 
-    floor_noise = produce_floor_noise(points_num=int(n_points/4))
-    pcd = np.vstack((np.asarray(pt.points), floor_noise))
+    pt = mesh.sample_points_uniformly(number_of_points=int(n_points*16/20),  use_triangle_normal=True)
+
+    floor_noise = produce_floor_noise(points_num=int(n_points*3/20))
+    rnd_noise = produce_random_noise(points_num=int(n_points/20))
+    pcd = np.vstack((np.asarray(pt.points), floor_noise, rnd_noise))
     print(len(pcd))
     # o3d.io.write_point_cloud(os.path.join(output_folder, "unseen_pointcloud.ply"), pcd)
     return pcd
 
 if __name__ == '__main__':
     items_gen_num = 12000
-    train2test_ratio = 0.6
-    output_folder= "dataset"
-    train_output_folder = "dataset/panel_data_train"
-    val_output_folder = "dataset/panel_data_val"
+    train2val_ratio = 0.6
+    output_folder= "dataset2"
+    train_output_folder = "dataset2/panel_data_train"
+    val_output_folder = "dataset2/panel_data_val"
+    test_output_folder = "dataset2/panel_data_test"
     n_points = 40000
     overwrite = False
     train_ids = []
@@ -172,42 +206,62 @@ if __name__ == '__main__':
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
+    #training
     if not os.path.exists(train_output_folder):
         os.mkdir(train_output_folder)
     else:
         train_dirs = os.listdir(train_output_folder)
         train_ids = [int(name[0:4]) for name in train_dirs]
+    #val
     if not os.path.exists(val_output_folder):
         os.mkdir(val_output_folder)
     else:
         val_dirs = os.listdir(val_output_folder)
         val_ids = [int(name[0:4]) for name in val_dirs]
+    #testing
+    if not os.path.exists(test_output_folder):
+        os.mkdir(test_output_folder)
+    else:
+        test_dirs = os.listdir(test_output_folder)
+        test_ids = [int(name[0:4]) for name in test_dirs]
 
-    #DEBUG
-    # mesh, labelboxes = generate_welding_area(vis=True)
+    # # DEBUG
+    # mesh, labelboxes = generate_welding_area(floors_num=-1, vis=True)
     # export(0, mesh, labelboxes, train_output_folder, 50000)
     # exit()
 
     #training
     print("---------Training dataset----------")
-    for i in range(int(items_gen_num * train2test_ratio)):
+    for i in range(int(items_gen_num * train2val_ratio)):
         if (not overwrite) and (i in train_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"...")
-        mesh, labelboxes = generate_welding_area()
+        mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,5), floors_num=np.random.randint(1,3))
         print(f'Exporting welding area...')
         export(i, mesh, labelboxes, train_output_folder, n_points, export_mesh=False)
         end = time.time()
         print("Welding area no.", i, "completed in ",end - start, "seconds \n")
 
-    #testing
+    #validation
     print(" \n \n---------Validation dataset---------- \n")
-    for i in range(int(items_gen_num * (1 - train2test_ratio))+1):
+    for i in range(int(items_gen_num * (1 - train2val_ratio)) + 1):
         if (not overwrite) and (i in val_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"... \n")
-        mesh, labelboxes = generate_welding_area()
+        mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,5), floors_num=np.random.randint(1,3))
         print(f'Exporting welding area...')
         export(i, mesh, labelboxes, val_output_folder, n_points, export_mesh=False)
+        end = time.time()
+        print("Welding area no.", i, "completed in ", end - start, "seconds \n")
+
+    #testing
+    print(" \n \n---------Testing dataset---------- \n")
+    for i in range(int(items_gen_num * (1 - train2val_ratio)) + 1):
+        if (not overwrite) and (i in test_ids): continue
+        start = time.time()
+        print("Generating welding area no.", i,"... \n")
+        mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,5), floors_num=np.random.randint(1,3))
+        print(f'Exporting welding area...')
+        export(i, mesh, labelboxes, test_output_folder, n_points, export_mesh=True)
         end = time.time()
         print("Welding area no.", i, "completed in ", end - start, "seconds \n")
