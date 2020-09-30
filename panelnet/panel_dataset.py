@@ -34,13 +34,13 @@ import panelnet_utils
 from panel_model_util import PanelDatasetConfig
 
 DC = PanelDatasetConfig() # dataset specific config
-MAX_NUM_OBJ = 32 # maximum number of objects allowed per scene
+MAX_NUM_OBJ = 6 # maximum number of objects allowed per scene
 MEAN_COLOR_RGB = np.array([0.5,0.5,0.5]) # sunrgbd color is in 0~1
 
 class PanelDetectionVotesDataset(Dataset):
     def __init__(self, split_set='train', num_points=20000,
         use_color=False, use_height=False,
-        augment=False, scan_idx_list=None):
+        augment=False, scan_idx_list=None, center_offset=True):
 
         assert(num_points<=50000)
 
@@ -56,6 +56,7 @@ class PanelDetectionVotesDataset(Dataset):
         self.augment = augment
         self.use_color = use_color
         self.use_height = use_height
+        self.center_offset = center_offset
        
     def __len__(self):
         return len(self.scan_names)
@@ -82,6 +83,17 @@ class PanelDetectionVotesDataset(Dataset):
         point_cloud = np.load(os.path.join(self.data_path, scan_name)+'_pc.npz')['pc'] # Nx6
         bboxes = np.load(os.path.join(self.data_path, scan_name)+'_bbox.npy') # K,8
         point_votes = np.load(os.path.join(self.data_path, scan_name)+'_votes.npz')['point_votes'] # Nx10
+
+        if self.center_offset:
+            offset = np.random.choice([-5, 0, 5], 2)
+            # offset = [1,1]
+            point_cloud[:,0] = point_cloud[:,0] + offset[0]
+            point_cloud[:,1] = point_cloud[:,1] + offset[1]
+            bboxes[:,0] = bboxes[:,0] + offset[0]
+            bboxes[:,1] = bboxes[:,1] + offset[1]
+            #not needed: seems that votes are a vector to the point seeds
+            # point_votes[:,[1,4,7]] = point_votes[:,[1,4,7]] + offset[0]
+            # point_votes[:,[2,5,8]] = point_votes[:,[2,5,8]] + offset[1]
 
         if not self.use_color:
             point_cloud = point_cloud[:,0:3]
@@ -252,7 +264,6 @@ def get_sem_cls_statistics():
     d = PanelDetectionVotesDataset()
     sem_cls_cnt = {}
     for i in range(len(d)):
-        if i%10==0: print(i)
         sample = d[i]
         pc = sample['point_clouds']
         sem_cls = sample['sem_cls_label']
@@ -266,8 +277,8 @@ def get_sem_cls_statistics():
 
 if __name__=='__main__':
     # d = PanelDetectionVotesDataset(use_height=True, use_color=True, use_v1=True, augment=True)
-    d = PanelDetectionVotesDataset('test')
-    sample = d[120]
+    d = PanelDetectionVotesDataset('train')
+    sample = d[0]
     print(sample['vote_label'].shape, sample['vote_label_mask'].shape)
     pc_util.write_ply(sample['point_clouds'], 'pc.ply')
     viz_votes(sample['point_clouds'], sample['vote_label'], sample['vote_label_mask'])

@@ -13,10 +13,13 @@ ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 from nn_distance import nn_distance, huber_loss
 
-FAR_THRESHOLD = 0.6
-NEAR_THRESHOLD = 0.3
+# FAR_THRESHOLD = 0.6
+# NEAR_THRESHOLD = 0.3
+NEAR_THRESHOLD = 0.05
+FAR_THRESHOLD = 0.1
 GT_VOTE_FACTOR = 3 # number of GT votes per point
-OBJECTNESS_CLS_WEIGHTS = [0.2,0.8] # put larger weights on positive objectness
+# OBJECTNESS_CLS_WEIGHTS = [0.1,0.8] # put larger weights on positive objectness
+OBJECTNESS_CLS_WEIGHTS = [0.1,0.9] # put larger weights on positive objectness
 
 def compute_vote_loss(end_points):
     """ Compute vote loss: Match predicted votes to GT votes.
@@ -95,6 +98,28 @@ def compute_objectness_loss(end_points):
     objectness_label[euclidean_dist1<NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1<NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1>FAR_THRESHOLD] = 1
+
+    # import open3d as o3d
+    # gtc = o3d.geometry.PointCloud()
+    # gtc.points = o3d.utility.Vector3dVector(gt_center.cpu().detach().numpy()[0])
+    # gtc.paint_uniform_color([0,0,1])
+    #
+    # pt = end_points['point_clouds']
+    # ptd = o3d.geometry.PointCloud()
+    # ptd.points = o3d.utility.Vector3dVector(pt.cpu().detach().numpy()[0])
+    # ptd.paint_uniform_color([0.5, 0.5, 0.5])
+    #
+    #
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(aggregated_vote_xyz.cpu().detach().numpy()[0])
+    # print(pcd.points)
+    # pcd.paint_uniform_color([1,0,0])
+    # colors = np.asarray(pcd.colors)
+    # om = objectness_mask.cpu().detach().numpy()[0]
+    # colors[om==1] = [0,1,0]
+    # pcd.colors = o3d.utility.Vector3dVector(colors)
+    # o3d.visualization.draw_geometries([pcd, ptd, gtc])
+
 
     # Compute objectness loss
     objectness_scores = end_points['objectness_scores']

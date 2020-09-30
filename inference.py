@@ -32,6 +32,7 @@ parser.add_argument('--per_class_proposal', action='store_true', help='Duplicate
 parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU threshold. [default: 0.25]')
 parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
 parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
+parser.add_argument('--rbw', action='store_true', help='Read mesh for RoboWeldAR pipeline and preprocess')
 
 
 
@@ -60,6 +61,53 @@ def preprocess_point_cloud(point_cloud):
     point_cloud = random_sampling(point_cloud, FLAGS.num_point)
     pc = np.expand_dims(point_cloud.astype(np.float32), 0) # (1,40000,4)
     return pc
+
+def preprocess_rbw_mesh(mesh, filter_radius=0.7, negative_filter=-0.05):
+    # ROBOWELDAR 3D RECONSTRUCTION SCAN PRE PROCESS
+    # mesh.scale(3,mesh.get_center())
+    point_cloud = mesh.sample_points_uniformly(number_of_points=int(FLAGS.num_point), use_triangle_normal=True)
+    point_cloud = np.asarray(point_cloud.points)
+    # crop in a semisphere
+    point_cloud = point_cloud[np.linalg.norm(point_cloud, axis=1) < filter_radius]  # points that have euclidian distance from 0 < filter_radius
+    point_cloud = point_cloud[point_cloud[:, 2] > negative_filter]  # points that have height larger than negative_filter
+
+    return point_cloud
+
+def visualize_results_rbw(dump_dir, predictions, rbw_mesh, object_point_threshold=200):
+    # confident_bboxes = os.path.join(dump_dir, "0000_pred_confident_nms_bbox.ply")
+    # bboxes = o3d.io.read_triangle_mesh(confident_bboxes)
+    # bboxes.compute_vertex_normals()
+
+    # bboxes.scale(1.2, center=bboxes.get_center())
+    pcds = [rbw_mesh]
+    for box in predictions[0]:
+
+        #transformations needed to translate votenet coordinates to NORMAL
+        bounding_box = np.array(box[1])
+        bounding_box[:, [0, 1, 2]] = bounding_box[:, [0, 2, 1]]
+        bounding_box[:,2] = bounding_box[:,2] * -1
+
+        box3d = o3d.geometry.OrientedBoundingBox.create_from_points(o3d.utility.Vector3dVector(bounding_box))
+        box3d.scale(1.05, center=box3d.get_center())
+        box3d.color = np.array([1., 0., 0.])
+
+        in_box_vertices = np.asarray(box3d.get_point_indices_within_bounding_box(rbw_mesh.vertices))
+
+        if len(in_box_vertices) < object_point_threshold: continue
+        # colors = np.asarray(rbw_mesh.vertex_colors)
+        # colors[in_box_vertices] = [1,0,0]
+        # rbw_mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
+
+        msh = o3d.geometry.TriangleMesh.select_by_index(rbw_mesh, in_box_vertices)
+        msh.paint_uniform_color([1,0,0])
+        msh.compute_vertex_normals()
+        msh.compute_triangle_normals()
+        # msh.scale(1.1, center=msh.get_center())
+
+        pcds.append(box3d)
+        pcds.append(msh)
+
+    o3d.visualization.draw_geometries(pcds)
 
 def visualize_results(dump_dir, predictions):
 
@@ -151,7 +199,7 @@ def text_3d(text, font='/usr/share/fonts/truetype/freefont/FreeMono.ttf', font_s
 
 if __name__=='__main__':
     # Set file paths and dataset config
-    demo_dir = os.path.join(BASE_DIR, 'demo_files') 
+    demo_dir = os.path.join(BASE_DIR, 'demo_files')
     if FLAGS.dataset == 'sunrgbd':
         sys.path.append(os.path.join(ROOT_DIR, 'sunrgbd'))
         from sunrgbd_detection_dataset import DC # dataset config
@@ -212,7 +260,7 @@ if __name__=='__main__':
                    sampling=FLAGS.cluster_sampling).to(device)
 
     print('Constructed model.')
-    
+
     # Load checkpoint
     optimizer = optim.Adam(net.parameters(), lr=0.001)
     checkpoint = torch.load(checkpoint_path)
@@ -220,19 +268,24 @@ if __name__=='__main__':
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
     print("Loaded checkpoint %s (epoch: %d)"%(checkpoint_path, epoch))
-   
+
     # Load and preprocess input point cloud 
     net.eval() # set model to eval mode (for bn and dp)
     if pc_path == 'generate':
         pcd = produce_unseen_sample_as_np(FLAGS.num_point)
-        pc = np.expand_dims(pcd.astype(np.float32), 0)  # (1,40000,4)
+        pc = preprocess_point_cloud(pcd)
 
     else:
-        point_cloud = read_ply(pc_path)
-        print("point_cloud",point_cloud)
+        if FLAGS.rbw:
+            rbw_mesh = o3d.io.read_triangle_mesh(pc_path)
+            print('RoboWeldAR mesh loaded: %s' % (pc_path))
+            point_cloud = preprocess_rbw_mesh(rbw_mesh)
+        else:
+            point_cloud = read_ply(pc_path)
+            print('Loaded point cloud data: %s' % (pc_path))
+
         pc = preprocess_point_cloud(point_cloud)
-        print('Loaded point cloud data: %s'%(pc_path))
-   
+
     # Model inference
     inputs = {'point_clouds': torch.from_numpy(pc).to(device)}
     print(inputs)
@@ -248,10 +301,13 @@ if __name__=='__main__':
         print("bbox class: ", box[0], " bbox confidence: ", box[2] )
 
     dump_dir = os.path.join(ROOT_DIR, '%s_inference_results'%(FLAGS.dataset))
-    if not os.path.exists(dump_dir): os.mkdir(dump_dir) 
+    if not os.path.exists(dump_dir): os.mkdir(dump_dir)
     MODEL.dump_results(end_points, dump_dir, DC, True)
     print('Dumped detection results to folder %s'%(dump_dir))
-    visualize_results(dump_dir, pred_map_cls)
+    if FLAGS.rbw:
+        visualize_results_rbw(dump_dir, pred_map_cls, rbw_mesh)
+    else:
+        visualize_results(dump_dir, pred_map_cls)
 
 
 

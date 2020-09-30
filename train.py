@@ -137,10 +137,11 @@ elif FLAGS.dataset == 'panelnet':
     from panel_model_util import PanelDatasetConfig
     DATASET_CONFIG = PanelDatasetConfig()
     TRAIN_DATASET = PanelDetectionVotesDataset('train', num_points=NUM_POINT,
-        augment=False,
-        use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
+                                               augment=True, use_color=FLAGS.use_color,
+                                               use_height=(not FLAGS.no_height))
     TEST_DATASET = PanelDetectionVotesDataset('val', num_points=NUM_POINT,
-        augment=False, use_color=FLAGS.use_color, use_height=(not FLAGS.no_height))
+                                              augment=False, use_color=FLAGS.use_color,
+                                              use_height=(not FLAGS.no_height))
 else:
     print('Unknown dataset %s. Exiting...'%(FLAGS.dataset))
     exit(-1)

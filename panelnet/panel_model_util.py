@@ -17,15 +17,17 @@ class PanelDatasetConfig(object):
         self.num_heading_bin = 12
         self.num_size_cluster = 2
 
-        # self.type2class={'floor':0, 'panel':1}
-        # self.type2onehotclass={'floor':0, 'panel':1,}
-        # self.type_mean_size = {'floor': np.array([300,300,10]),
+        # self.type2class={'hpanel':0, 'panel':1}
+        # self.type2onehotclass={'hpanel':0, 'panel':1,}
+        # self.type_mean_size = {'hpanel': np.array([300,300,10]),
         #                   'panel': np.array([300,10,300])}
 
-        self.type2class = {'panel': 0, 'floor': 1}
-        self.type2onehotclass = {'panel': 0, 'floor': 1}
-        self.type_mean_size = {'panel': np.array([0.07, 2, 1]),
-                               'floor': np.array([2, 2, 0.07])}
+        self.type2class = {'panel': 0, 'hpanel': 1}
+        self.type2onehotclass = {'panel': 0, 'hpanel': 1}
+        self.type_mean_size = {'panel': np.array([0.012, 0.30, 0.20]),
+                               'hpanel': np.array([0.30, 0.30, 0.012])}
+        # self.type_mean_size = {'panel': np.array([0.07, 2, 1]),
+        #                        'hpanel': np.array([2, 2, 0.07])}
 
         self.class2type = {self.type2class[t]:t for t in self.type2class}
 
