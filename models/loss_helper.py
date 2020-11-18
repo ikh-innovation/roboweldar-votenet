@@ -99,26 +99,6 @@ def compute_objectness_loss(end_points):
     objectness_mask[euclidean_dist1<NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1>FAR_THRESHOLD] = 1
 
-    # import open3d as o3d
-    # gtc = o3d.geometry.PointCloud()
-    # gtc.points = o3d.utility.Vector3dVector(gt_center.cpu().detach().numpy()[0])
-    # gtc.paint_uniform_color([0,0,1])
-    #
-    # pt = end_points['point_clouds']
-    # ptd = o3d.geometry.PointCloud()
-    # ptd.points = o3d.utility.Vector3dVector(pt.cpu().detach().numpy()[0])
-    # ptd.paint_uniform_color([0.5, 0.5, 0.5])
-    #
-    #
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = o3d.utility.Vector3dVector(aggregated_vote_xyz.cpu().detach().numpy()[0])
-    # print(pcd.points)
-    # pcd.paint_uniform_color([1,0,0])
-    # colors = np.asarray(pcd.colors)
-    # om = objectness_mask.cpu().detach().numpy()[0]
-    # colors[om==1] = [0,1,0]
-    # pcd.colors = o3d.utility.Vector3dVector(colors)
-    # o3d.visualization.draw_geometries([pcd, ptd, gtc])
 
 
     # Compute objectness loss
@@ -131,6 +111,38 @@ def compute_objectness_loss(end_points):
     object_assignment = ind1 # (B,K) with values in 0,1,...,K2-1
 
     return objectness_loss, objectness_label, objectness_mask, object_assignment
+
+def compute_point_inclusion_loss(end_points):
+    """ Compute the loss of points close to center of  the proposals.
+
+    Args:
+        end_points: dict (read-only)
+
+    Returns:
+
+    """
+    # Associate proposal and GT objects by point-to-point distances
+    gt_center = end_points['center_label'][:,:,0:3]
+    pred_center = end_points['center']
+    pointclouds = end_points['point_clouds'][:, :, 0:3]
+    B = gt_center.shape[0]  # batch size
+    K = pointclouds.shape[1]  # number of points
+    K2 = gt_center.shape[1]  # number of centers
+
+    dist_gt, _, _, _ = nn_distance(pointclouds, gt_center) # dist1: BxK, dist2: BxK2
+    euclidean_dist_gt = torch.sqrt(dist_gt + 1e-6)
+    points_num_close_to_center_gt = euclidean_dist_gt[euclidean_dist_gt < NEAR_THRESHOLD].shape[0]
+    print(points_num_close_to_center_gt)
+
+    dist_pred, _, _, _ = nn_distance(pointclouds, pred_center)  # dist1: BxK, dist2: BxK2
+    euclidean_dist_pred = torch.sqrt(dist_pred + 1e-6)
+    points_num_close_to_center_pred = euclidean_dist_pred[euclidean_dist_pred < NEAR_THRESHOLD].shape[0]
+    print(points_num_close_to_center_pred)
+
+    point_inclusion_loss = (points_num_close_to_center_gt - points_num_close_to_center_pred) / (K + 1e-6)
+
+    return point_inclusion_loss
+
 
 def compute_box_and_sem_cls_loss(end_points, config):
     """ Compute 3D bounding box and semantic classification loss.
@@ -208,6 +220,26 @@ def compute_box_and_sem_cls_loss(end_points, config):
 
     return center_loss, heading_class_loss, heading_residual_normalized_loss, size_class_loss, size_residual_normalized_loss, sem_cls_loss
 
+#Depricated
+def get_obj_loss(end_points, config):
+    pred_center = end_points['center']
+    num_proposal = pred_center.shape[1]
+    batch_size = pred_center.shape[0]
+    pred_heading_class = torch.argmax(end_points['heading_scores'], -1) # B,num_proposal
+    pred_heading_residual = torch.gather(end_points['heading_residuals'], 2, pred_heading_class.unsqueeze(-1)) # B,num_proposal,1 #.squeeze(2)
+    pred_size_class = torch.argmax(end_points['size_scores'], -1) # B,num_proposal
+    pred_size_residual = torch.gather(end_points['size_residuals'], 2, pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1,1,1,3)) # B,num_proposal,1,3
+
+
+    for i in range(batch_size):
+        obbs = []
+        for j in range(num_proposal):
+            obb = config.param2obb(pred_center[i, j], pred_heading_class[i, j], pred_heading_residual[i, j],
+                                   pred_size_class[i, j], pred_size_residual[i, j])
+            obbs.append(obb)
+
+    return obj_loss
+
 def get_loss(end_points, config):
     """ Loss functions
 
@@ -261,8 +293,10 @@ def get_loss(end_points, config):
     box_loss = center_loss + 0.1*heading_cls_loss + heading_reg_loss + 0.1*size_cls_loss + size_reg_loss
     end_points['box_loss'] = box_loss
 
+    point_inclusion_loss = compute_point_inclusion_loss(end_points)
+
     # Final loss function
-    loss = vote_loss + 0.5*objectness_loss + box_loss + 0.1*sem_cls_loss
+    loss = vote_loss + 0.5*objectness_loss + box_loss + 0.1*sem_cls_loss + 0.3*point_inclusion_loss
     loss *= 10
     end_points['loss'] = loss
 

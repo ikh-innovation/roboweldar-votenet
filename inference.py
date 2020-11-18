@@ -25,6 +25,7 @@ parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU thresho
 parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
 parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
 parser.add_argument('--rbw', action='store_true', help='Read mesh for RoboWeldAR pipeline and preprocess')
+parser.add_argument('--min_points_2b_empty', type=int, help='Minimum number of contained points in a bounding box to be considered and not to be accounted for')
 
 FLAGS = parser.parse_args()
 
@@ -94,7 +95,7 @@ def rbw_inference(FLAGS, point_cloud: np.ndarray):
     panel_train_dir = os.path.join(BASE_DIR, FLAGS.checkpoint_dir)
     checkpoint_path = os.path.join(panel_train_dir, 'checkpoint.tar')
 
-    eval_config_dict = {'remove_empty_box': True, 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,
+    eval_config_dict = {'remove_empty_box': True, 'min_points_2b_empty': FLAGS.min_points_2b_empty, 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,
                         'use_old_type_nms': FLAGS.use_old_type_nms, 'cls_nms': FLAGS.use_cls_nms,
                         'per_class_proposal': FLAGS.per_class_proposal,
                         'conf_thresh': FLAGS.conf_thresh, 'dataset_config': DC}
@@ -178,7 +179,7 @@ if __name__=='__main__':
         print('Unkown dataset %s. Exiting.'%(DATASET))
         exit(-1)
 
-    eval_config_dict = {'remove_empty_box': True, 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,
+    eval_config_dict = {'remove_empty_box': True, 'min_points_2b_empty': FLAGS.min_points_2b_empty, 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,
         'use_old_type_nms': FLAGS.use_old_type_nms, 'cls_nms': FLAGS.use_cls_nms,
                    'per_class_proposal': FLAGS.per_class_proposal,
                    'conf_thresh': FLAGS.conf_thresh, 'dataset_config': DC}
