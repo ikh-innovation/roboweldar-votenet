@@ -99,12 +99,15 @@ def parse_predictions(end_points, config_dict):
                 box3d = pred_corners_3d_upright_camera[i,j,:,:] # (8,3)
                 box3d = flip_axis_to_depth(box3d)
                 pc_in_box,inds = extract_pc_in_box3d(pc, box3d)
-                if len(pc_in_box) < 5:
+                if len(pc_in_box) < config_dict['min_points_2b_empty']:
                     nonempty_box_mask[i,j] = 0
         # -------------------------------------
 
     obj_logits = end_points['objectness_scores'].detach().cpu().numpy()
     obj_prob = softmax(obj_logits)[:,:,1] # (B,K)
+
+
+
     if not config_dict['use_3d_nms']:
         # ---------- NMS input: pred_with_prob in (B,K,7) -----------
         pred_mask = np.zeros((bsize, K))
@@ -146,8 +149,10 @@ def parse_predictions(end_points, config_dict):
     elif config_dict['use_3d_nms'] and config_dict['cls_nms']:
         # ---------- NMS input: pred_with_prob in (B,K,8) -----------
         pred_mask = np.zeros((bsize, K))
+        batch_pc = end_points['point_clouds'].cpu().numpy()[:,:,0:3] # B,N,3
         for i in range(bsize):
             boxes_3d_with_prob = np.zeros((K,8))
+            pc = batch_pc[i,:,:] # (N,3)
             for j in range(K):
                 boxes_3d_with_prob[j,0] = np.min(pred_corners_3d_upright_camera[i,j,:,0])
                 boxes_3d_with_prob[j,1] = np.min(pred_corners_3d_upright_camera[i,j,:,1])
@@ -155,7 +160,11 @@ def parse_predictions(end_points, config_dict):
                 boxes_3d_with_prob[j,3] = np.max(pred_corners_3d_upright_camera[i,j,:,0])
                 boxes_3d_with_prob[j,4] = np.max(pred_corners_3d_upright_camera[i,j,:,1])
                 boxes_3d_with_prob[j,5] = np.max(pred_corners_3d_upright_camera[i,j,:,2])
-                boxes_3d_with_prob[j,6] = obj_prob[i,j]
+
+                box3d = pred_corners_3d_upright_camera[i,j,:,:] # (8,3)
+                box3d = flip_axis_to_depth(box3d)
+                pc_in_box,inds = extract_pc_in_box3d(pc, box3d)
+                boxes_3d_with_prob[j,6] = len(pc_in_box)
                 boxes_3d_with_prob[j,7] = pred_sem_cls[i,j] # only suppress if the two boxes are of the same class!!
             nonempty_box_inds = np.where(nonempty_box_mask[i,:]==1)[0]
             pick = nms_3d_faster_samecls(boxes_3d_with_prob[nonempty_box_mask[i,:]==1,:],
