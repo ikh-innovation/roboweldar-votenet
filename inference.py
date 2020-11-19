@@ -25,7 +25,7 @@ parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU thresho
 parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
 parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
 parser.add_argument('--rbw', action='store_true', help='Read mesh for RoboWeldAR pipeline and preprocess')
-parser.add_argument('--min_points_2b_empty', type=int, help='Minimum number of contained points in a bounding box to be considered and not to be accounted for')
+parser.add_argument('--min_points_2b_empty', type=int, default=5, help='Minimum number of contained points in a bounding box to be considered and not to be accounted for')
 
 FLAGS = parser.parse_args()
 

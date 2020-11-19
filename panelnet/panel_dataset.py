@@ -85,7 +85,7 @@ class PanelDetectionVotesDataset(Dataset):
         point_votes = np.load(os.path.join(self.data_path, scan_name)+'_votes.npz')['point_votes'] # Nx10
 
         if self.center_offset:
-            offset = np.random.choice([-5, 0, 5], 2)
+            offset = np.random.choice([-1, 0, 1], 2)
             # offset = [1,1]
             point_cloud[:,0] = point_cloud[:,0] + offset[0]
             point_cloud[:,1] = point_cloud[:,1] + offset[1]

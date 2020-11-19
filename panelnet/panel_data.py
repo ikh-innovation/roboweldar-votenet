@@ -67,7 +67,7 @@ def get_idx_list(pointcloud,panels,labelboxes):
     color_list = []
     for i in np.asarray(pointcloud.colors)[:,0]:
         if np.round(i,4) not in color_list:
-            color_list.append(np.round(i,4)) 
+            color_list.append(np.round(i,4))
     
     #take list of ending point of every object
     end_of_object_list=[]
@@ -191,9 +191,7 @@ def generate_welding_area(panels_num=2, hpanels_num=1, vis=False):
 
     #reconstruct the final pointcloud
     pcd = get_idx_list(pcd,panels,labelboxes)
-      
-    o3d.visualization.draw_geometries([pcd])
-    
+
     if vis: o3d.visualization.draw_geometries([coords, mesh])
 
     # return mesh, [labelbox, labelbox2, labelbox3]
@@ -277,13 +275,13 @@ def produce_unseen_sample_as_np(n_points):
     return np.asarray(pt.points)
 
 if __name__ == '__main__':
-    items_gen_num = 10
-    train2val_ratio = 1
+    items_gen_num = 10000
+    train2val_ratio = 0.8
     output_folder= "dataset"
     train_output_folder = "dataset/panel_data_train"
     val_output_folder = "dataset/panel_data_val"
     test_output_folder = "dataset/panel_data_test"
-    n_points = 30000
+    n_points = 40000
     overwrite = False
     train_ids = []
     val_ids = []
@@ -312,10 +310,10 @@ if __name__ == '__main__':
         test_ids = [int(name[0:4]) for name in test_dirs]
 
     # DEBUG
-    pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(1,4), hpanels_num=np.random.randint(1,3), vis=False)
+    # pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(1,4), hpanels_num=np.random.randint(1,3), vis=False)
     # pcd, mesh, labelboxes = generate_welding_area(panels_num=0, hpanels_num=3, vis=False)
     # export(0, mesh, labelboxes, train_output_folder, 50000)
-    exit()
+    # exit()
 
     #training
     print("---------Training dataset----------")
@@ -323,7 +321,7 @@ if __name__ == '__main__':
         if (not overwrite) and (i in train_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"...")
-        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,4), hpanels_num=np.random.randint(1,3))
+        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,4), hpanels_num=np.random.randint(1,3), vis=False)
         print(f'Exporting welding area...')
         export(pcd, i, mesh, labelboxes, train_output_folder, n_points, export_mesh=False)
         end = time.time()
@@ -335,7 +333,7 @@ if __name__ == '__main__':
         if (not overwrite) and (i in val_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"... \n")
-        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,4), hpanels_num=np.random.randint(1,3))
+        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,4), hpanels_num=np.random.randint(1,3), vis=False)
         print(f'Exporting welding area...')
         export(pcd, i, mesh, labelboxes, val_output_folder, n_points, export_mesh=False)
         end = time.time()

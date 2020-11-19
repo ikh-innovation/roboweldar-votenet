@@ -4,7 +4,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--vis_dir',  help='Directory that includes the seeds points and prediction points')
-parser.add_argument('--file_no',  help='Number of file to be visualized')
+parser.add_argument('--file_no',  help='Number of file to be visualized', default='0000')
 
 FLAGS = parser.parse_args()
 
@@ -12,7 +12,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ROOT_DIR = BASE_DIR
 # sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 
-o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
+# o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
 
 
 
