@@ -28,6 +28,11 @@ parser.add_argument('--rbw', action='store_true', help='Read mesh for RoboWeldAR
 parser.add_argument('--min_points_2b_empty', type=int, default=5, help='Minimum number of contained points in a bounding box to be considered and not to be accounted for')
 
 FLAGS = parser.parse_args()
+# FLAGS.pc_path = "/home/innovation/Projects/roboweldar-weld-seam-detection/seam-detection/welding_scenes_eval/21/21.obj"
+FLAGS.pc_path = "/home/innovation/Projects/pytorch/votenet/panelnet/pc.ply"
+# FLAGS.checkpoint_dir = 'log_panelnet/log_10-08-18:15'
+# FLAGS.checkpoint_dir = 'log_panelnet/log_11-25-16:33'
+# FLAGS.checkpoint_dir = 'log_panelnet/log_12-08-10:44'
 
 import torch
 import torch.nn as nn

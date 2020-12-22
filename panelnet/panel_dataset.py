@@ -277,8 +277,8 @@ def get_sem_cls_statistics():
 
 if __name__=='__main__':
     # d = PanelDetectionVotesDataset(use_height=True, use_color=True, use_v1=True, augment=True)
-    d = PanelDetectionVotesDataset('train')
-    sample = d[0]
+    d = PanelDetectionVotesDataset('train', center_offset=False)
+    sample = d[40]
     print(sample['vote_label'].shape, sample['vote_label_mask'].shape)
     pc_util.write_ply(sample['point_clouds'], 'pc.ply')
     viz_votes(sample['point_clouds'], sample['vote_label'], sample['vote_label_mask'])

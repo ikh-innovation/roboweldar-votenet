@@ -13,13 +13,13 @@ ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 from nn_distance import nn_distance, huber_loss
 
-# FAR_THRESHOLD = 0.6
-# NEAR_THRESHOLD = 0.3
-NEAR_THRESHOLD = 0.05
-FAR_THRESHOLD = 0.1
+# NEAR_THRESHOLD = 0.015
+# FAR_THRESHOLD = 0.035
+NEAR_THRESHOLD = 0.025
+FAR_THRESHOLD = 0.07
 GT_VOTE_FACTOR = 3 # number of GT votes per point
 # OBJECTNESS_CLS_WEIGHTS = [0.1,0.8] # put larger weights on positive objectness
-OBJECTNESS_CLS_WEIGHTS = [0.1,0.9] # put larger weights on positive objectness
+OBJECTNESS_CLS_WEIGHTS = [0.2,0.8] # put larger weights on positive objectness
 
 def compute_vote_loss(end_points):
     """ Compute vote loss: Match predicted votes to GT votes.
@@ -129,17 +129,19 @@ def compute_point_inclusion_loss(end_points):
     K = pointclouds.shape[1]  # number of points
     K2 = gt_center.shape[1]  # number of centers
 
+    inclusion_mask_gt = torch.zeros((B, K)).cuda()
+    inclusion_mask_pred = torch.zeros((B, K)).cuda()
+
     dist_gt, _, _, _ = nn_distance(pointclouds, gt_center) # dist1: BxK, dist2: BxK2
     euclidean_dist_gt = torch.sqrt(dist_gt + 1e-6)
-    points_num_close_to_center_gt = euclidean_dist_gt[euclidean_dist_gt < NEAR_THRESHOLD].shape[0]
-    print(points_num_close_to_center_gt)
+    inclusion_mask_gt[euclidean_dist_gt < FAR_THRESHOLD] = 1
 
     dist_pred, _, _, _ = nn_distance(pointclouds, pred_center)  # dist1: BxK, dist2: BxK2
     euclidean_dist_pred = torch.sqrt(dist_pred + 1e-6)
-    points_num_close_to_center_pred = euclidean_dist_pred[euclidean_dist_pred < NEAR_THRESHOLD].shape[0]
-    print(points_num_close_to_center_pred)
+    inclusion_mask_pred[euclidean_dist_pred < FAR_THRESHOLD] = 1
 
-    point_inclusion_loss = (points_num_close_to_center_gt - points_num_close_to_center_pred) / (K + 1e-6)
+    point_inclusion_loss = torch.abs(torch.sum(inclusion_mask_gt) - torch.sum(inclusion_mask_pred))  / (K * B + 1e-6)
+    # point_inclusion_loss = (points_num_close_to_center_gt - points_num_close_to_center_pred) / (K + 1e-6)
 
     return point_inclusion_loss
 
@@ -294,7 +296,7 @@ def get_loss(end_points, config):
     end_points['box_loss'] = box_loss
 
     point_inclusion_loss = compute_point_inclusion_loss(end_points)
-
+    end_points['point_inclusion_loss'] = point_inclusion_loss
     # Final loss function
     loss = vote_loss + 0.5*objectness_loss + box_loss + 0.1*sem_cls_loss + 0.3*point_inclusion_loss
     loss *= 10

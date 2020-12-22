@@ -41,7 +41,7 @@ from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', default='votenet', help='Model file name [default: votenet]')
-parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
+parser.add_argument('--dataset', default='panelnet', help='Dataset name. sunrgbd or scannet or panelnet. [default: sunrgbd]')
 parser.add_argument('--log_dir', default=None, help='Dump dir to save model checkpoint [default: log]')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
 parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
@@ -138,18 +138,18 @@ elif FLAGS.dataset == 'panelnet':
     DATASET_CONFIG = PanelDatasetConfig()
     TRAIN_DATASET = PanelDetectionVotesDataset('train', num_points=NUM_POINT,
                                                augment=True, use_color=FLAGS.use_color,
-                                               use_height=(not FLAGS.no_height))
-    TEST_DATASET = PanelDetectionVotesDataset('val', num_points=NUM_POINT,
+                                               use_height=(not FLAGS.no_height), center_offset=True)
+    TEST_DATASET = PanelDetectionVotesDataset('test', num_points=NUM_POINT,
                                               augment=False, use_color=FLAGS.use_color,
-                                              use_height=(not FLAGS.no_height))
+                                              use_height=(not FLAGS.no_height), center_offset=False)
 else:
     print('Unknown dataset %s. Exiting...'%(FLAGS.dataset))
     exit(-1)
 print(len(TRAIN_DATASET), len(TEST_DATASET))
 TRAIN_DATALOADER = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE,
-    shuffle=True, num_workers=4, worker_init_fn=my_worker_init_fn)
+    shuffle=True, num_workers=8, worker_init_fn=my_worker_init_fn)
 TEST_DATALOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE,
-    shuffle=True, num_workers=4, worker_init_fn=my_worker_init_fn)
+    shuffle=True, num_workers=8, worker_init_fn=my_worker_init_fn)
 print(len(TRAIN_DATALOADER), len(TEST_DATALOADER))
 
 # Init the model and optimzier
@@ -218,7 +218,7 @@ TEST_VISUALIZER = TfVisualizer(FLAGS, 'test')
 # Used for AP calculation
 CONFIG_DICT = {'remove_empty_box':False, 'use_3d_nms':True,
     'nms_iou':0.25, 'use_old_type_nms':False, 'cls_nms':True,
-    'per_class_proposal': True, 'conf_thresh':0.05,
+    'per_class_proposal': True, 'conf_thresh':0.05, 'min_points_2b_empty': 5,
     'dataset_config':DATASET_CONFIG}
 
 # ------------------------------------------------------------------------- GLOBAL CONFIG END
@@ -288,7 +288,7 @@ def evaluate_one_epoch():
                 if key not in stat_dict: stat_dict[key] = 0
                 stat_dict[key] += end_points[key].item()
 
-        batch_pred_map_cls = parse_predictions(end_points, CONFIG_DICT) 
+        batch_pred_map_cls = parse_predictions(end_points, CONFIG_DICT)
         batch_gt_map_cls = parse_groundtruths(end_points, CONFIG_DICT) 
         ap_calculator.step(batch_pred_map_cls, batch_gt_map_cls)
 
@@ -337,6 +337,7 @@ def train(start_epoch):
         except:
             save_dict['model_state_dict'] = net.state_dict()
         torch.save(save_dict, os.path.join(LOG_DIR, 'checkpoint.tar'))
+        # torch.save(save_dict, os.path.join(LOG_DIR, 'checkpoint%d.tar'%(epoch)))
 
 if __name__=='__main__':
     train(start_epoch)

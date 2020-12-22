@@ -417,11 +417,14 @@ def write_oriented_bbox(scene_bbox, out_filename):
     scene = trimesh.scene.Scene()
     for box in scene_bbox:
         scene.add_geometry(convert_oriented_box_to_trimesh_fmt(box))        
-    
-    mesh_list = trimesh.util.concatenate(scene.dump())
-    # save to ply file    
-    trimesh.io.export.export_mesh(mesh_list, out_filename, file_type='ply')
-    
+
+    try:
+        mesh_list = trimesh.util.concatenate(scene.dump())
+        # save to ply file
+        trimesh.io.export.export_mesh(mesh_list, out_filename, file_type='ply')
+    except:
+        print("Error exporting trimesh object. Probably empty mesh.")
+
     return
 
 def write_oriented_bbox_camera_coord(scene_bbox, out_filename):

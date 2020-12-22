@@ -28,9 +28,9 @@ class PanelConfig:
         self.position = (np.random.uniform(-position_radius, position_radius), np.random.uniform(-position_radius, position_radius), 0)
         self.rotation = (0,0, np.random.uniform(0, np.pi))#2*np.pi))
         if not is_hpanel: #panel
-            self.size = (np.random.uniform(0.01, 0.013), np.random.uniform(0.275, 0.325), np.random.uniform(0.175, 0.225))
+            self.size = (np.random.uniform(0.009, 0.015), np.random.uniform(0.2, 0.4), np.random.uniform(0.1, 0.3))
         else:
-            self.size = (np.random.uniform(0.175, 0.225), np.random.uniform(0.275, 0.325), np.random.uniform(0.01, 0.013))
+            self.size = (np.random.uniform(0.1, 0.3), np.random.uniform(0.2, 0.4), np.random.uniform(0.009, 0.015))
 
 
 def switch_xy(size: np.array):
@@ -66,20 +66,20 @@ def create_surface(size=(0.75, 0.75, 0), sub_iter=4, noise = 0.02):
 def get_idx_list(pointcloud,panels,labelboxes):
     color_list = []
     for i in np.asarray(pointcloud.colors)[:,0]:
-        if np.round(i,4) not in color_list:
-            color_list.append(np.round(i,4))
-    
+        if np.round(i,8) not in color_list:
+            color_list.append(np.round(i,8))
+
     #take list of ending point of every object
     end_of_object_list=[]
     for i in range(len(panels)+1):
         idx = np.where(np.asarray(pointcloud.colors)[:,0] == color_list[i])
         end_of_object_list.append(idx[0][-1])
-    
+
     #create a pointcloud only with surface point
     surface_pcd = o3d.geometry.PointCloud()
     surface_pcd.points = o3d.utility.Vector3dVector(np.asarray(pointcloud.points)[:end_of_object_list[0], :])
 
-    #create a list with indexes of points that have to be removed 
+    #create a list with indexes of points that have to be removed
     indexes = []
     for i in range(len(panels)):
         obb = copy.deepcopy(labelboxes[i].bounding_box)
@@ -88,7 +88,7 @@ def get_idx_list(pointcloud,panels,labelboxes):
 
     idx_list =[]
     for i in range(len(panels)):
-        idx_list += indexes[i] 
+        idx_list += indexes[i]
 
     new = sorted(idx_list)
 
@@ -99,7 +99,7 @@ def get_idx_list(pointcloud,panels,labelboxes):
             newlist.append(i)
 
     newlist.reverse()
-    
+
     #seting the reconstructed pointcloud
     for i in newlist:
         pointcloud.points = o3d.utility.Vector3dVector(np.delete(np.asarray(pointcloud.points), i,0))
@@ -107,7 +107,7 @@ def get_idx_list(pointcloud,panels,labelboxes):
     return pointcloud
 
 
-def generate_welding_area(panels_num=2, hpanels_num=1, vis=False):
+def generate_welding_area(panels_num=2, hpanels_num=1, vis=False, points_no=30000):
     coords = o3d.geometry.TriangleMesh.create_coordinate_frame()
 
     panels = []
@@ -119,9 +119,9 @@ def generate_welding_area(panels_num=2, hpanels_num=1, vis=False):
         panel_config = PanelConfig()
         panel_config.randomize(is_hpanel=True)
         panel, sub_iter = create_panel(panel_config.size, sub_iter=4, noise = 0.002)
-        panel.paint_uniform_color(list(np.random.randint(10000, size=3)/10000))
+        panel.paint_uniform_color(list(np.random.randint(10000000, size=3)/10000000))
         oriented_bounding_box = panel.get_axis_aligned_bounding_box().get_oriented_bounding_box()
-        
+
         #transformations
         panel.rotate(o3d.geometry.get_rotation_matrix_from_xyz(panel_config.rotation), panel.get_center())
         panel.translate(np.array(panel_config.position) - np.array([panel.get_center()[0], panel.get_center()[1], 0]))
@@ -149,8 +149,8 @@ def generate_welding_area(panels_num=2, hpanels_num=1, vis=False):
             cnt += 1
             panels.append(panel)
             labelboxes.append(labelbox)
-        else:print("fail to find")
-        
+        # else:print("fail to find")
+
     #verticsal panels
     #bounding label box
     for i in range(panels_num):
@@ -158,7 +158,7 @@ def generate_welding_area(panels_num=2, hpanels_num=1, vis=False):
         panel_config = PanelConfig()
         panel_config.randomize()
         panel, sub_iter = create_panel(panel_config.size, sub_iter=4, noise = 0.002)
-        panel.paint_uniform_color(list(np.random.randint(10000, size=3)/10000))
+        panel.paint_uniform_color(list(np.random.randint(10000000, size=3)/10000000))
         oriented_bounding_box = panel.get_axis_aligned_bounding_box().get_oriented_bounding_box()
 
         #transformations
@@ -170,11 +170,11 @@ def generate_welding_area(panels_num=2, hpanels_num=1, vis=False):
 
         center_oriented = oriented_bounding_box.get_center()
         labelbox = LabelBox(center_oriented, (np.array(panel_config.size)+0.005)/2, -panel_config.rotation[2], CLASS_WHITELIST[0], oriented_bounding_box)
-        
+
         #deleting bottom layer
         panel.triangles = o3d.utility.Vector3iVector(np.asarray(panel.triangles)[:(10*(4**sub_iter)), :])
         panel.triangle_normals = o3d.utility.Vector3dVector(np.asarray(panel.triangle_normals)[:(10*(4**sub_iter)), :])
-        
+
         panels.append(panel)
         labelboxes.append(labelbox)
 
@@ -187,7 +187,7 @@ def generate_welding_area(panels_num=2, hpanels_num=1, vis=False):
 
     for panel in panels: mesh += panel
 
-    pcd = mesh.sample_points_uniformly(number_of_points=30000)
+    pcd = mesh.sample_points_uniformly(number_of_points=points_no)
 
     #reconstruct the final pointcloud
     pcd = get_idx_list(pcd,panels,labelboxes)
@@ -225,7 +225,7 @@ def export(pcd, idx: int, mesh, labelboxes: [LabelBox], output_folder, n_points,
         obbs = np.zeros((0, 8))
     else:
         obbs = np.vstack(object_list)  # (K,8)
-        
+
     np.save(os.path.join(output_folder, '%04d_bbox.npy' % (idx)), obbs)
 
     #---------save votes----------
@@ -274,8 +274,41 @@ def produce_unseen_sample_as_np(n_points):
 
     return np.asarray(pt.points)
 
+def generate_test_data(test_data_folder="/home/innovation/Projects/roboweldar-weld-seam-detection/seam-detection/welding_scenes_eval/", num=10):
+    for i in range(num):
+        current_scene_dir = os.path.join(test_data_folder, "gen_%04d" % i)
+        if not os.path.exists(current_scene_dir):
+            os.mkdir(current_scene_dir)
+        print("Generating welding area no.", i, "...")
+        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(1, 3), hpanels_num=np.random.randint(1, 3), vis=False, points_no=300000)
+        print(f'Exporting welding area...')
+        export2json(pcd, i, mesh, labelboxes, current_scene_dir, export_mesh=True)
+
+
+def export2json(pcd, idx: int, mesh, labelboxes: [LabelBox], output_folder, export_mesh=True):
+    #--------mesh----------
+    if export_mesh:
+        o3d.io.write_triangle_mesh(os.path.join(output_folder,"gen_%04d.ply" % idx), mesh, compressed=True, write_vertex_colors=True)
+    o3d.io.write_point_cloud(os.path.join(output_folder, "gen_%04d.pcd" % idx), pcd)
+
+    figures = []
+
+    for i in range(len(labelboxes)):
+        figures.append({"geometry": {"position": {"x": labelboxes[i].center[0],
+                                                  "y": labelboxes[i].center[1],
+                                                  "z": labelboxes[i].center[2]},
+                                     "dimensions": {"x": labelboxes[i].size[0]*2,
+                                                    "y": labelboxes[i].size[1]*2,
+                                                    "z": labelboxes[i].size[2]*2},
+                                     "rotation": {"z": -labelboxes[i].heading_angle}}})
+    data = {"figures": figures}
+
+
+    with open(os.path.join(output_folder,"gen_%04d.json" % idx), 'w') as fp:
+        json.dump(data, fp, indent=4)
+
 if __name__ == '__main__':
-    items_gen_num = 10000
+    items_gen_num = 12500
     train2val_ratio = 0.8
     output_folder= "dataset"
     train_output_folder = "dataset/panel_data_train"
@@ -309,11 +342,15 @@ if __name__ == '__main__':
         test_dirs = os.listdir(test_output_folder)
         test_ids = [int(name[0:4]) for name in test_dirs]
 
-    # DEBUG
-    # pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(1,4), hpanels_num=np.random.randint(1,3), vis=False)
-    # pcd, mesh, labelboxes = generate_welding_area(panels_num=0, hpanels_num=3, vis=False)
-    # export(0, mesh, labelboxes, train_output_folder, 50000)
+    # # DEBUG
+    # pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(1,3), hpanels_num=np.random.randint(1,3), vis=True)
+    # # pcd, mesh, labelboxes = generate_welding_area(panels_num=0, hpanels_num=3, vis=False)
+    # export(pcd, 0, mesh, labelboxes, "/home/innovation/Projects/pytorch/votenet/panelnet/test_paneldata", n_points, export_mesh=True)
+    #
     # exit()
+
+    generate_test_data(num=30)
+    exit()
 
     #training
     print("---------Training dataset----------")
@@ -321,7 +358,7 @@ if __name__ == '__main__':
         if (not overwrite) and (i in train_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"...")
-        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,4), hpanels_num=np.random.randint(1,3), vis=False)
+        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(1,3), hpanels_num=np.random.randint(1,3), vis=False)
         print(f'Exporting welding area...')
         export(pcd, i, mesh, labelboxes, train_output_folder, n_points, export_mesh=False)
         end = time.time()
@@ -333,7 +370,7 @@ if __name__ == '__main__':
         if (not overwrite) and (i in val_ids): continue
         start = time.time()
         print("Generating welding area no.", i,"... \n")
-        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(2,4), hpanels_num=np.random.randint(1,3), vis=False)
+        pcd, mesh, labelboxes = generate_welding_area(panels_num=np.random.randint(1,3), hpanels_num=np.random.randint(1,3), vis=False)
         print(f'Exporting welding area...')
         export(pcd, i, mesh, labelboxes, val_output_folder, n_points, export_mesh=False)
         end = time.time()
