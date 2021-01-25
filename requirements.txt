@@ -1,0 +1,10 @@
+numpy>=1.18.5
+open3d>=0.10.0.0
+trimesh>=2.35.39
+matplotlib>=2.2.5
+plyfile>=0.7.2
+scipy>=1.4.1
+tensorflow>=2.2.0
+opencv-python>=4.3.0.36
+setuptools>=49.2.0
+pointnet2>=0.0.0
