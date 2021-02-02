@@ -6,34 +6,6 @@ import importlib
 import time
 import open3d as o3d
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='panelnet', help='Dataset: sunrgbd or scannet or panelnet [default: panelnet]')
-parser.add_argument('--checkpoint_dir',  help='checkpoint directory of the thrained weights.')
-parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
-parser.add_argument('--use_height', type=bool, default=False, help='Use height? [default: False]')
-parser.add_argument('--use_color', type=bool, default=False, help='Use height? [default: False]')
-parser.add_argument('--pc_path', type=str, default='generate', help='Pointcloud absolute path. [generate] for random generation')
-parser.add_argument('--cluster_sampling', default='vote_fps', help='Sampling strategy for vote clusters: vote_fps, seed_fps, random [default: vote_fps]')
-parser.add_argument('--model', default='votenet', help='Model file name [default: votenet]')
-parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
-parser.add_argument('--vote_factor', type=int, default=1, help='Vote factor [default: 1]')
-parser.add_argument('--use_3d_nms', action='store_true', help='Use 3D NMS instead of 2D NMS.')
-parser.add_argument('--use_cls_nms', action='store_true', help='Use per class NMS.')
-parser.add_argument('--use_old_type_nms', action='store_true', help='Use old type of NMS, IoBox2Area.')
-parser.add_argument('--per_class_proposal', action='store_true', help='Duplicate each proposal num_class times.')
-parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU threshold. [default: 0.25]')
-parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
-parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
-parser.add_argument('--rbw', action='store_true', help='Read mesh for RoboWeldAR pipeline and preprocess')
-parser.add_argument('--min_points_2b_empty', type=int, default=5, help='Minimum number of contained points in a bounding box to be considered and not to be accounted for')
-
-FLAGS = parser.parse_args()
-# FLAGS.pc_path = "/home/innovation/Projects/roboweldar-weld-seam-detection/seam-detection/welding_scenes_eval/21/21.obj"
-FLAGS.pc_path = "/home/innovation/Projects/pytorch/votenet/panelnet/pc.ply"
-# FLAGS.checkpoint_dir = 'log_panelnet/log_10-08-18:15'
-# FLAGS.checkpoint_dir = 'log_panelnet/log_11-25-16:33'
-# FLAGS.checkpoint_dir = 'log_panelnet/log_12-08-10:44'
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -45,7 +17,7 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 from pc_util import random_sampling, read_ply
 from ap_helper import parse_predictions
 
-def preprocess_point_cloud(point_cloud):
+def preprocess_point_cloud(FLAGS, point_cloud):
     ''' Prepare the numpy point cloud (N,3) for forward pass '''
     point_cloud = point_cloud[:,0:3] # do not use color for now
     if FLAGS.use_height:
@@ -136,7 +108,7 @@ def rbw_inference(FLAGS, point_cloud: np.ndarray):
     net.eval()  # set model to eval mode (for bn and dp)
 
     # ---------------------LOAD AND PREPROCESS POINTCLOUD---------------------
-    pc = preprocess_point_cloud(point_cloud)
+    pc = preprocess_point_cloud(FLAGS, point_cloud)
 
     # ---------------------MODEL INFERENCE---------------------
     inputs = {'point_clouds': torch.from_numpy(pc).to(device)}
@@ -156,6 +128,36 @@ def rbw_inference(FLAGS, point_cloud: np.ndarray):
 
 
 if __name__=='__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', default='panelnet',
+                        help='Dataset: sunrgbd or scannet or panelnet [default: panelnet]')
+    parser.add_argument('--checkpoint_dir', help='checkpoint directory of the thrained weights.')
+    parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
+    parser.add_argument('--use_height', type=bool, default=False, help='Use height? [default: False]')
+    parser.add_argument('--use_color', type=bool, default=False, help='Use height? [default: False]')
+    parser.add_argument('--pc_path', type=str, default='generate',
+                        help='Pointcloud absolute path. [generate] for random generation')
+    parser.add_argument('--cluster_sampling', default='vote_fps',
+                        help='Sampling strategy for vote clusters: vote_fps, seed_fps, random [default: vote_fps]')
+    parser.add_argument('--model', default='votenet', help='Model file name [default: votenet]')
+    parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
+    parser.add_argument('--vote_factor', type=int, default=1, help='Vote factor [default: 1]')
+    parser.add_argument('--use_3d_nms', action='store_true', help='Use 3D NMS instead of 2D NMS.')
+    parser.add_argument('--use_cls_nms', action='store_true', help='Use per class NMS.')
+    parser.add_argument('--use_old_type_nms', action='store_true', help='Use old type of NMS, IoBox2Area.')
+    parser.add_argument('--per_class_proposal', action='store_true', help='Duplicate each proposal num_class times.')
+    parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU threshold. [default: 0.25]')
+    parser.add_argument('--conf_thresh', type=float, default=0.05,
+                        help='Filter out predictions with obj prob less than it. [default: 0.05]')
+    parser.add_argument('--faster_eval', action='store_true',
+                        help='Faster evaluation by skippling empty bounding box removal.')
+    parser.add_argument('--rbw', action='store_true', help='Read mesh for RoboWeldAR pipeline and preprocess')
+    parser.add_argument('--min_points_2b_empty', type=int, default=5,
+                        help='Minimum number of contained points in a bounding box to be considered and not to be accounted for')
+
+    FLAGS = parser.parse_args()
+
+
     # ---------------------FILEPATHS AND CONFIG---------------------
     demo_dir = os.path.join(BASE_DIR, 'demo_files')
     if FLAGS.dataset == 'sunrgbd':
@@ -224,7 +226,7 @@ if __name__=='__main__':
     # ---------------------LOAD AND PREPROCESS POINTCLOUD---------------------
     if pc_path == 'generate':
         pcd = produce_unseen_sample_as_np(FLAGS.num_point)
-        pc = preprocess_point_cloud(pcd)
+        pc = preprocess_point_cloud(FLAGS, pcd)
     else:
         if FLAGS.rbw:
             rbw_mesh = o3d.io.read_triangle_mesh(pc_path)
@@ -235,7 +237,7 @@ if __name__=='__main__':
             point_cloud = read_ply(pc_path)
             print('Loaded point cloud data: %s' % (pc_path))
 
-        pc = preprocess_point_cloud(point_cloud)
+        pc = preprocess_point_cloud(FLAGS, point_cloud)
 
     #---------------------MODEL INFERENCE---------------------
     inputs = {'point_clouds': torch.from_numpy(pc).to(device)}
