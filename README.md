@@ -1,3 +1,17 @@
+# RoboWeldAR Votenet
+This is an modified version of Facebook Ai Research Team's Votenet by Thanos Sakelliou. The main parts that are modified or developed and are used in the project of RoboWeldAR are described below. The original README is then quoted.
+
+## Panelnet Dataset
+To teach Votenet to detect the required panels as objects, a new dataset was created by synthtic generated data. The generator is included in [panel_data](./panelnet/panel_data.py). This submodule is rensponsible for generating scenes of multiple panel configurations (random, confined by various parameters) as well as annotating them (ground truth labels, bounding boxes) and saving them in a way readable by Votenet. These welding scenes are generated in a way that simulates a real welding example of vertical panels.
+
+Next, the data loader in [panel_dataset](./panelnet/panel_dataset.py), built similarly with the data loader of SUN RGB-D dataset (used in the orignal work), is responsible for loading the generated data and feeding it to Votenet.
+
+## Inference
+An [inference](./panel_dataset.py) submodule was also built to perform a forward pass of the model given a mesh or a pointcloud scene. The output predictions are also displayed graphically to the user with the interface of [Open3D](http://www.open3d.org). This submodule also includes `rbw_inference` function, which is set up for use in `roboweldar-weld-seam-detection` module.
+
+
+
+
 # Deep Hough Voting for 3D Object Detection in Point Clouds
 Created by <a href="http://charlesrqi.com" target="_blank">Charles R. Qi</a>, <a href="https://orlitany.github.io/" target="_blank">Or Litany</a>, <a href="http://kaiminghe.com/" target="_blank">Kaiming He</a> and <a href="https://geometry.stanford.edu/member/guibas/" target="_blank">Leonidas Guibas</a> from <a href="https://research.fb.com/category/facebook-ai-research/" target="_blank">Facebook AI Research</a> and <a href="http://www.stanford.edu" target="_blank">Stanford University</a>.
 
