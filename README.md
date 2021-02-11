@@ -12,6 +12,8 @@ In [panel_model_util](./panelnet/panel_model_util.py) and [panelnet_utils](./pan
 
 The generated dataset can be found in #TODO and should be put in a subfolder of votenet, called "panelnet".
 
+![Alt text](scene_gen.png?raw=true "Example of Panelnet")
+
 ## Votenet Model
 The model was also tweaked to better fit our dataset. In the [loss_helper](./models/loss_helper.py) file, the objectness thresholds(`FAR_THRESHOLD, NEAR_THRESHOLD`) were modified, to better represent a small distance near centers that is not bigger than objects. This is because our data seem to be smaller, or in a smaller scale (which is the real-world one) than the originally used datasets. Furthermore another loss was added to the loss function, that of Point Inclusion (`compute_point_inclusion_loss`). This loss will help the model fit better to Panelnet, as it will further ignore the votes than do have enough neighbors. This is only helpful for datasets that the centers of objects are surrounded by many points. 
 
