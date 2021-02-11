@@ -1,14 +1,30 @@
 # RoboWeldAR Votenet
 This is an modified version of Facebook Ai Research Team's Votenet by Thanos Sakelliou. The main parts that are modified or developed and are used in the project of RoboWeldAR are described below. The original README is then quoted.
 
+The training, inference and evaluation submodules, were set up and tuned to work by default with our own developed dataset described below. 
+
 ## Panelnet Dataset
 To teach Votenet to detect the required panels as objects, a new dataset was created by synthtic generated data. The generator is included in [panel_data](./panelnet/panel_data.py). This submodule is rensponsible for generating scenes of multiple panel configurations (random, confined by various parameters) as well as annotating them (ground truth labels, bounding boxes) and saving them in a way readable by Votenet. These welding scenes are generated in a way that simulates a real welding example of vertical panels.
 
 Next, the data loader in [panel_dataset](./panelnet/panel_dataset.py), built similarly with the data loader of SUN RGB-D dataset (used in the orignal work), is responsible for loading the generated data and feeding it to Votenet.
 
-## Inference
-An [inference](./panel_dataset.py) submodule was also built to perform a forward pass of the model given a mesh or a pointcloud scene. The output predictions are also displayed graphically to the user with the interface of [Open3D](http://www.open3d.org). This submodule also includes `rbw_inference` function, which is set up for use in `roboweldar-weld-seam-detection` module.
+In [panel_model_util](./panelnet/panel_model_util.py) and [panelnet_utils](./panelnet/panelnet_utils.py)  the two classes of this dataset are defined (vertical and horizontal panels), along with their average size values, and other dataset specific information. 
 
+The generated dataset can be found in #TODO and should be put in a subfolder of votenet, called "panelnet".
+
+## Votenet Model
+The model was also tweaked to better fit our dataset. In the [loss_helper](./models/loss_helper.py) file, the objectness thresholds(`FAR_THRESHOLD, NEAR_THRESHOLD`) were modified, to better represent a small distance near centers that is not bigger than objects. This is because our data seem to be smaller, or in a smaller scale (which is the real-world one) than the originally used datasets. Furthermore another loss was added to the loss function, that of Point Inclusion (`compute_point_inclusion_loss`). This loss will help the model fit better to Panelnet, as it will further ignore the votes than do have enough neighbors. This is only helpful for datasets that the centers of objects are surrounded by many points. 
+
+
+
+## Inference
+An [inference](./inference.py) submodule was also built to perform a forward pass of the model given a mesh or a pointcloud scene. The output predictions are also displayed graphically to the user with the interface of [Open3D](http://www.open3d.org). This submodule also includes `rbw_inference` function, which is set up for use in [roboweldar weld seam detection](https://github.com/ikh-innovation/roboweldar-weld-seam-detection) module.
+
+## Train & Evaluation
+The [train](./train.py) and [evaluation](./eval.py) was also lightly tweaked to properly work with this dataset. For each training done, the weights, the hyperparameters and other info, are stored into `log_panelnet` folder. This folder is available in #TODO.
+Graphs can be seen by running:
+
+`python -m tensorboard.main --logdir=<path-to-votenet>/log_panelnet/`
 
 
 
