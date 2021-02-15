@@ -10,7 +10,7 @@ Next, the data loader in [panel_dataset](./panelnet/panel_dataset.py), built sim
 
 In [panel_model_util](./panelnet/panel_model_util.py) and [panelnet_utils](./panelnet/panelnet_utils.py)  the two classes of this dataset are defined (vertical and horizontal panels), along with their average size values, and other dataset specific information. 
 
-The generated dataset can be found in #TODO and should be put in a subfolder of votenet, called "panelnet".
+The generated dataset can be found in [dataset](https://iknowhow-my.sharepoint.com/:f:/p/tsakelliou/ElvM0V49FFtNnvGwG8wrqGUBvFNP7BTcW_j22QQVlMvPfQ?e=BNiSII) and should be put in a subfolder of votenet, called "panelnet".
 
 ![Alt text](scene_gen.png?raw=true "Example of Panelnet")
 
@@ -23,7 +23,8 @@ The model was also tweaked to better fit our dataset. In the [loss_helper](./mod
 An [inference](./inference.py) submodule was also built to perform a forward pass of the model given a mesh or a pointcloud scene. The output predictions are also displayed graphically to the user with the interface of [Open3D](http://www.open3d.org). This submodule also includes `rbw_inference` function, which is set up for use in [roboweldar weld seam detection](https://github.com/ikh-innovation/roboweldar-weld-seam-detection) module.
 
 ## Train & Evaluation
-The [train](./train.py) and [evaluation](./eval.py) was also lightly tweaked to properly work with this dataset. For each training done, the weights, the hyperparameters and other info, are stored into `log_panelnet` folder. This folder is available in #TODO.
+The [train](./train.py) and [evaluation](./eval.py) was also lightly tweaked to properly work with this dataset. For each training done, the weights, the hyperparameters and other info, are stored into `log_panelnet` folder. This folder is available in {log_panelnet](https://iknowhow-my.sharepoint.com/:f:/p/tsakelliou/Emef3YWWlrpBiAWEXqr_QCgB8shRabGuU25A--wrWd6FqQ?e=AClUMq).
+
 Graphs can be seen by running:
 
 `python -m tensorboard.main --logdir=<path-to-votenet>/log_panelnet/`
