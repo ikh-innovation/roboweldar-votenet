@@ -29,6 +29,8 @@ Graphs can be seen by running:
 
 `python -m tensorboard.main --logdir=<path-to-votenet>/log_panelnet/`
 
+## Pre-trained Weights
+Weights of the training with Panelnet required for inference, can be found [here](weights_checkpoint)
 
 
 # Deep Hough Voting for 3D Object Detection in Point Clouds
