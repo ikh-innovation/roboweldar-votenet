@@ -349,8 +349,8 @@ if __name__ == '__main__':
     #
     # exit()
 
-    generate_test_data(num=30)
-    exit()
+    # generate_test_data(num=30)
+    # exit()
 
     #training
     print("---------Training dataset----------")
